@@ -2,45 +2,48 @@ import AppKit
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-  func applicationDidFinishLaunching(_ notification: Notification) {
-    NSApp.setActivationPolicy(.accessory)
-    DispatchQueue.main.async {
-      NSApp.activate(ignoringOtherApps: true)
-    }
-  }
-
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    false
+    true
   }
 }
 
 @main
 struct AgentFilesApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-  @State private var store = AgentFilesStore()
+  @State private var store = AgentFilesStore.makeForLaunch()
 
   var body: some Scene {
-    WindowGroup("Agent Files", id: "main") {
+    Window("Agent Files", id: "main") {
       ContentView(store: store)
     }
-    .defaultSize(width: 1_120, height: 720)
+    .defaultSize(width: 1_100, height: 740)
     .windowResizability(.contentMinSize)
-    .defaultLaunchBehavior(.presented)
-
-    MenuBarExtra {
-      MenuBarView(store: store)
-    } label: {
-      Image(
-        systemName: store.hasBlockingIssue
-          ? "exclamationmark.triangle.fill"
-          : "arrow.triangle.2.circlepath"
-      )
-      .accessibilityLabel("Agent Files")
-    }
-    .menuBarExtraStyle(.menu)
 
     Settings {
       SettingsView(store: store)
     }
+  }
+}
+
+extension AgentFilesStore {
+  /// Uses `AGENT_FILES_HOME` as a sandboxed home folder when set, for demos and testing.
+  static func makeForLaunch() -> AgentFilesStore {
+    guard let path = ProcessInfo.processInfo.environment["AGENT_FILES_HOME"] else {
+      return AgentFilesStore()
+    }
+    let home = URL(fileURLWithPath: path, isDirectory: true)
+    let support = home.appendingPathComponent("Agent Files Support", isDirectory: true)
+    let backups = support.appendingPathComponent("Backups", isDirectory: true)
+    return AgentFilesStore(
+      configurationStore: ConfigurationStore(
+        fileURL: support.appendingPathComponent("configuration.json")
+      ),
+      templateStore: TemplateStore(directory: support.appendingPathComponent("Templates")),
+      backupService: BackupService(rootURL: backups),
+      skillLibrary: SkillLibraryService(
+        backupRootURL: backups.appendingPathComponent("Skills", isDirectory: true)
+      ),
+      homeDirectory: home
+    )
   }
 }

@@ -1,36 +1,33 @@
 import Foundation
 
 struct AppConfiguration: Codable, Equatable, Sendable {
-  static let currentSchemaVersion = 1
+  static let currentSchemaVersion = 3
 
   var schemaVersion: Int
-  var automaticSyncEnabled: Bool
-  var groups: [SyncGroup]
+  var workspaces: [Workspace]
+  var trackedSkills: [TrackedSkill]
 
   init(
     schemaVersion: Int = Self.currentSchemaVersion,
-    automaticSyncEnabled: Bool = true,
-    groups: [SyncGroup] = []
+    workspaces: [Workspace] = [],
+    trackedSkills: [TrackedSkill] = []
   ) {
     self.schemaVersion = schemaVersion
-    self.automaticSyncEnabled = automaticSyncEnabled
-    self.groups = groups
+    self.workspaces = workspaces
+    self.trackedSkills = trackedSkills
   }
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion
-    case automaticSyncEnabled
-    case groups
+    case workspaces
+    case trackedSkills
   }
 
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
-    automaticSyncEnabled =
-      try container.decodeIfPresent(
-        Bool.self,
-        forKey: .automaticSyncEnabled
-      ) ?? true
-    groups = try container.decodeIfPresent([SyncGroup].self, forKey: .groups) ?? []
+    workspaces = try container.decodeIfPresent([Workspace].self, forKey: .workspaces) ?? []
+    trackedSkills =
+      try container.decodeIfPresent([TrackedSkill].self, forKey: .trackedSkills) ?? []
   }
 }

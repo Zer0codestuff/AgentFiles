@@ -10,19 +10,9 @@ struct PersistenceAndBackupTests {
     try withTemporaryDirectory { temporaryDirectory in
       let fileURL = temporaryDirectory.appendingPathComponent("configuration.json")
       let configurationStore = ConfigurationStore(fileURL: fileURL)
-      let managedFile = ManagedInstructionFile(
-        url: URL(fileURLWithPath: "/tmp/AGENTS.md"),
-        tool: .codex
-      )
       let expected = AppConfiguration(
-        automaticSyncEnabled: false,
-        groups: [
-          SyncGroup(
-            name: "Shared",
-            files: [managedFile],
-            automaticSyncEnabled: false
-          )
-        ]
+        workspaces: [Workspace.project(at: URL(fileURLWithPath: "/tmp/project"))],
+        trackedSkills: [TrackedSkill(name: "review", locationIDs: ["codex"], baselineDigest: "a")]
       )
 
       try configurationStore.save(expected)
@@ -36,8 +26,7 @@ struct PersistenceAndBackupTests {
     try withTemporaryDirectory { temporaryDirectory in
       let sourceURL = temporaryDirectory.appendingPathComponent("AGENTS.md")
       let backupRoot = temporaryDirectory.appendingPathComponent("Backups")
-      let file = ManagedInstructionFile(url: sourceURL)
-      let groupID = UUID()
+      let workspaceID = UUID()
       let backupService = BackupService(
         rootURL: backupRoot,
         retainedBackupsPerFile: 2
@@ -45,13 +34,13 @@ struct PersistenceAndBackupTests {
 
       for value in ["one", "two", "three"] {
         try value.write(to: sourceURL, atomically: true, encoding: .utf8)
-        try backupService.backup(file: file, groupID: groupID)
+        try backupService.backup(fileAt: sourceURL, workspaceID: workspaceID, key: "codex")
       }
 
       let fileBackupDirectory =
         backupRoot
-        .appendingPathComponent(groupID.uuidString)
-        .appendingPathComponent(file.id.uuidString)
+        .appendingPathComponent(workspaceID.uuidString)
+        .appendingPathComponent("codex")
       let backups = try FileManager.default.contentsOfDirectory(
         at: fileBackupDirectory,
         includingPropertiesForKeys: nil

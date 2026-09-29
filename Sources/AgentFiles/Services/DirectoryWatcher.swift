@@ -44,28 +44,41 @@ final class DirectoryWatcher: @unchecked Sendable {
   }
 }
 
+/// Watches instruction files and their folders. Folder events catch files that are
+/// created or atomically replaced; file events catch edits written in place.
 @MainActor
 final class FileObservationService {
-  private var watchers: [UUID: DirectoryWatcher] = [:]
+  private var directoryWatchers: [String: DirectoryWatcher] = [:]
+  private var fileWatchers: [String: DirectoryWatcher] = [:]
 
   func watch(
-    file: ManagedInstructionFile,
-    onChange: @escaping @MainActor @Sendable (UUID) -> Void
-  ) throws {
-    watchers[file.id] = try DirectoryWatcher(
-      directoryURL: file.url.deletingLastPathComponent()
-    ) {
+    directories: Set<String>,
+    files: Set<String>,
+    onChange: @escaping @MainActor @Sendable () -> Void
+  ) {
+    let handler: @Sendable () -> Void = {
       Task { @MainActor in
-        onChange(file.id)
+        onChange()
       }
     }
-  }
 
-  func stopWatching(fileID: UUID) {
-    watchers[fileID] = nil
-  }
+    for path in Set(directoryWatchers.keys).subtracting(directories) {
+      directoryWatchers[path] = nil
+    }
+    for path in directories where directoryWatchers[path] == nil {
+      directoryWatchers[path] = try? DirectoryWatcher(
+        directoryURL: URL(fileURLWithPath: path, isDirectory: true),
+        eventHandler: handler
+      )
+    }
 
-  func stopAll() {
-    watchers.removeAll()
+    // A replaced file gets a new inode, so file watchers are always recreated.
+    fileWatchers = [:]
+    for path in files {
+      fileWatchers[path] = try? DirectoryWatcher(
+        directoryURL: URL(fileURLWithPath: path),
+        eventHandler: handler
+      )
+    }
   }
 }

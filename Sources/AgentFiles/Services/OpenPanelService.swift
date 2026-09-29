@@ -3,17 +3,16 @@ import Foundation
 
 @MainActor
 struct OpenPanelService {
-  func chooseInstructionFiles() -> [URL] {
+  func chooseProjectFolder() -> URL? {
     let panel = NSOpenPanel()
-    panel.title = "Add instruction files"
-    panel.message = "Choose UTF-8 text files to add to this sync group."
-    panel.prompt = "Add"
-    panel.canChooseFiles = true
-    panel.canChooseDirectories = false
-    panel.allowsMultipleSelection = true
-    panel.resolvesAliases = true
-    panel.showsHiddenFiles = true
+    panel.title = "Add project"
+    panel.message = "Choose a project folder. Agent Files syncs its AGENTS.md and CLAUDE.md."
+    panel.prompt = "Add Project"
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.allowsMultipleSelection = false
+    panel.canCreateDirectories = false
 
-    return panel.runModal() == .OK ? panel.urls : []
+    return panel.runModal() == .OK ? panel.url : nil
   }
 }

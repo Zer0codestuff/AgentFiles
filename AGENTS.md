@@ -2,9 +2,13 @@
 
 ## Purpose and architecture
 
-Agent Files is a macOS 26 SwiftUI menu bar app that groups and synchronizes text instruction files. `AgentFilesStore` owns app state. Models are Codable value types. Services handle file I/O, backups, directory observation, open panels, persistence, and synchronization planning. Views use a three-column `NavigationSplitView`, a dedicated settings scene, and a `MenuBarExtra`.
+Agent Files is a macOS 26 SwiftUI app for managing the instruction files of Claude Code, Codex, Factory, Cursor, Grok Build, and Warp. Each workspace (Global, or one project) owns one `InstructionTemplate`: shared lines plus lines limited to some files through `only` and `except` audiences. Rendering the template for a file key produces that file's exact contents, so instruction files never contain markers. Templates live in `Application Support/Agent Files/Templates/`.
 
-Whole-file replacement is the only active synchronization strategy. Keep strategy resolution separate so shared blocks and local protected sections can be added later without changing file observation or persistence.
+`AgentFilesStore` owns app state. `LineDiff` powers imports, edits, and the diff views. Editing a file applies its line diff back to the template, either shared with every file that has the changed lines or kept only in that file. Files changed in another app are flagged and never overwritten until the user keeps or discards the change. Skills are a secondary library in `AgentFilesStore+Skills.swift` and `SkillLibraryService`.
+
+Global workspaces include Cursor and Warp as copy-only targets (`WorkspaceTarget.writesFile == false`) because both keep user rules in app settings. `AppIconProvider` loads agent icons from installed apps through Launch Services, with a drawn `GrokMark` for Grok Build.
+
+Views use a two-column `NavigationSplitView`: a sidebar with Global, projects, and Skills, and a detail pane with per-file tabs, an Edit mode, and a Differences mode. The app is a regular Dock app and quits when its window closes.
 
 ## Run, build, and test
 
@@ -18,15 +22,14 @@ The test script invokes `swift test` with the active toolchain's Swift Testing f
 
 ## Current status
 
-The first functional version is complete. The repository targets macOS 26 and Swift 6. The app is intentionally menu-bar-only and does not show a Dock icon. On 2026-08-30, all eight focused tests passed, the staged app bundle launched successfully, and the main window, group sheet, and settings scenes were checked in the running app.
+The repository targets macOS 26 and Swift 6. On 2026-09-29, all 29 focused tests passed, and setup, editing, Differences, and outside-change review were checked in the running app against a sandboxed home folder. Set `AGENT_FILES_HOME` to run the app against a sandboxed home folder instead of the real one.
 
 ## Recent changes
 
-- Added SwiftPM app and test targets, the staged `.app` build script, and the Codex Run action.
-- Added persistent sync groups, UTF-8 file management, automatic directory observation, editor saves, and app-wide plus per-group sync switches.
-- Added whole-file synchronization behind a strategy protocol, concurrent-edit detection, atomic writes, and up to 20 backups per managed file.
-- Added the three-column SwiftUI window, Liquid Glass controls, menu bar scene, settings, group and file management, search, and file editor.
-- Added focused tests for planning, conflicts, persistence, backup retention, disabled sync, and external-editor propagation.
+- Replaced sync groups, layers, and the menu bar extra with template-based workspaces for Global and project instructions.
+- Added per-file editing with a shared or file-only save scope, a Differences view with Use for All, and review for files changed outside the app.
+- Added Cursor and Warp to Global as copy-only targets and replaced symbol badges with real app icons.
+- Kept Skills as a secondary library with comparison, install, sync previews, backups, and opt-in Keep in Sync.
 
 ## Project preferences and constraints
 
@@ -39,14 +42,17 @@ The first functional version is complete. The repository targets macOS 26 and Sw
 
 ## Known issues and next steps
 
-- Add section-aware synchronization with shared and local block markers.
+- Grok Build loads both `AGENTS.md` and `Claude.md` in a project, so a project workspace gives Grok duplicate instructions.
+- Workspaces only manage the default files. Adding custom files, such as `GEMINI.md`, is not supported yet.
+- Cursor and Warp keep user rules outside the file system. Their Global variants must be pasted into each app's settings by hand.
 - Add signed distribution and security-scoped bookmarks if the app is sandboxed.
-- Add a Launch at Login preference if the app should start automatically after sign-in.
 
 ## Do not
 
 - Do not delete, rename, or move managed instruction files.
-- Do not synchronize while the global or group automatic-sync switch is off.
-- Do not allow one path to belong to multiple sync groups.
+- Do not write instruction files except through an explicit user action.
+- Do not allow one path to belong to multiple workspaces.
+- Do not overwrite a skill folder without backing it up first.
 - Do not overwrite a file after concurrent edits without an explicit user action.
 - Do not replace native macOS sidebars, toolbars, or controls with custom chrome.
+- Do not add markers or other app metadata to instruction files.

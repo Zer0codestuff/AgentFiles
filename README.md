@@ -1,17 +1,25 @@
 # Agent Files
 
-Agent Files is a macOS 26 menu bar app for viewing and synchronizing instruction files such as `AGENTS.md` and `CLAUDE.md`.
+Agent Files is a macOS 26 app for managing the instruction files of Claude Code, Codex, Factory, Cursor, Grok Build, and Warp from one place.
 
-## Current scope
+## How it works
 
-- Organize files into sync groups.
-- Edit files inside the app.
-- Watch for changes made by external editors.
-- Mirror the newest intentional change across a group.
-- Disable automatic sync globally or for one group.
-- Back up every overwritten file and stop on concurrent edits.
+Each workspace keeps one shared text and remembers which lines differ in each file:
 
-The first release synchronizes whole files. The sync strategy is isolated so a later release can merge shared blocks while preserving app-specific sections.
+- **Global** manages each agent's user instructions: `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.factory/AGENTS.md`, and `~/.grok/AGENTS.md`. Cursor and Warp keep user rules in their own settings, so they get a variant you copy into Cursor Settings > Rules or Warp's rules.
+- **Projects** manage a folder's `AGENTS.md` (Codex, Cursor, Factory, Grok Build, Warp) and `CLAUDE.md` (Claude Code).
+
+Setting up a workspace imports the existing files without changing them. Pick one file as the starting point, and the differences in the other files are kept as file-specific lines.
+
+- **Edit** shows the exact contents of one file. Save edits for every file, or only for the file you are editing.
+- **Differences** lists every place where the files differ, side by side, with Use for All to make one version shared.
+- Files edited in another app are flagged. Review the change, then keep it for that file, share it with every file, or discard it.
+
+Agents appear with the icons of their installed apps. Grok Build has no desktop app, so it uses a drawn mark.
+
+Files stay plain Markdown. The template is stored in `~/Library/Application Support/Agent Files/Templates/`, and every file is backed up before the app overwrites it.
+
+**Skills** is a secondary library for comparing and syncing skill folders across agents.
 
 ## Run
 
@@ -19,12 +27,10 @@ The first release synchronizes whole files. The sync strategy is isolated so a l
 ./script/build_and_run.sh
 ```
 
-Use `./script/build_and_run.sh --verify` to build, launch, and confirm that the process stays running.
+Use `./script/build_and_run.sh --verify` to build, launch, and confirm that the process stays running. Set `AGENT_FILES_HOME=/path/to/folder` and launch the binary in `dist/Agent Files.app/Contents/MacOS/` to try the app against a sandboxed home folder.
 
 ## Test
 
 ```sh
 ./script/test.sh
 ```
-
-Configuration and backups live in `~/Library/Application Support/Agent Files/`. The app never deletes managed instruction files.

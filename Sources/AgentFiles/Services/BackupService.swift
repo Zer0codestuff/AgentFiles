@@ -12,20 +12,18 @@ struct BackupService: Sendable {
     self.retainedBackupsPerFile = retainedBackupsPerFile
   }
 
+  /// Copies the current file before the app overwrites it.
   @discardableResult
-  func backup(
-    file: ManagedInstructionFile,
-    groupID: UUID
-  ) throws -> URL? {
-    guard FileManager.default.fileExists(atPath: file.path) else {
+  func backup(fileAt url: URL, workspaceID: UUID, key: String) throws -> URL? {
+    guard FileManager.default.fileExists(atPath: url.path) else {
       return nil
     }
 
-    let data = try Data(contentsOf: file.url)
+    let data = try Data(contentsOf: url)
     let directory =
       rootURL
-      .appendingPathComponent(groupID.uuidString, isDirectory: true)
-      .appendingPathComponent(file.id.uuidString, isDirectory: true)
+      .appendingPathComponent(workspaceID.uuidString, isDirectory: true)
+      .appendingPathComponent(key, isDirectory: true)
 
     try FileManager.default.createDirectory(
       at: directory,
@@ -35,7 +33,7 @@ struct BackupService: Sendable {
     let timestamp = String(format: "%.6f", Date().timeIntervalSince1970)
       .replacingOccurrences(of: ".", with: "-")
     let backupURL = directory.appendingPathComponent(
-      "\(timestamp)-\(UUID().uuidString)-\(file.url.lastPathComponent)"
+      "\(timestamp)-\(url.lastPathComponent)"
     )
     try data.write(to: backupURL, options: .atomic)
     try prune(directory: directory)
@@ -45,7 +43,7 @@ struct BackupService: Sendable {
   private func prune(directory: URL) throws {
     let files = try FileManager.default.contentsOfDirectory(
       at: directory,
-      includingPropertiesForKeys: [.contentModificationDateKey],
+      includingPropertiesForKeys: nil,
       options: [.skipsHiddenFiles]
     )
     let overflow = files.sorted { $0.lastPathComponent < $1.lastPathComponent }

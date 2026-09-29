@@ -11,7 +11,15 @@ enum AppDirectories {
     applicationSupport.appendingPathComponent("configuration.json")
   }
 
+  static var templates: URL {
+    applicationSupport.appendingPathComponent("Templates", isDirectory: true)
+  }
+
   static var backups: URL {
     applicationSupport.appendingPathComponent("Backups", isDirectory: true)
+  }
+
+  static var skillBackups: URL {
+    backups.appendingPathComponent("Skills", isDirectory: true)
   }
 }
