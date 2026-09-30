@@ -1,0 +1,21 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.20000,0.22000,0.29000,1.00000",
+      "srgb:0.07000,0.08000,0.11000,1.00000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        { "image-name" : "front.png", "name" : "front", "glass" : true },
+        { "image-name" : "middle.png", "name" : "middle", "glass" : true },
+        { "image-name" : "back.png", "name" : "back", "glass" : true }
+      ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "specular" : true,
+      "translucency" : { "enabled" : false, "value" : 0.3 }
+    }
+  ],
+  "supported-platforms" : { "squares" : [ "macOS" ] }
+}

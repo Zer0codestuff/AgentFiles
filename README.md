@@ -12,7 +12,7 @@ Each workspace keeps one shared text and remembers which lines differ in each fi
 Setting up a workspace imports the existing files without changing them. Pick one file as the starting point, and the differences in the other files are kept as file-specific lines.
 
 - **Edit** shows the exact contents of one file. Save edits for every file, or only for the file you are editing.
-- **Differences** lists every place where the files differ, side by side, with Use for All to make one version shared.
+- **Differences** compares every file with the selected tab in a GitHub-style diff: removed and added lines, changed words highlighted, and unchanged lines folded. Use for All makes one version shared.
 - Files edited in another app are flagged. Review the change, then keep it for that file, share it with every file, or discard it.
 
 Agents appear with the icons of their installed apps. Grok Build has no desktop app, so it uses a drawn mark.

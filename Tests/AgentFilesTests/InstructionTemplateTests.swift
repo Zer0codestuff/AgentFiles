@@ -116,6 +116,51 @@ struct InstructionTemplateTests {
   }
 
   @Test
+  func comparisonShowsEachFileAgainstTheReference() throws {
+    let template = InstructionTemplate.importing(
+      base: codex,
+      others: [(key: "factory", content: factory), (key: "grok", content: codex)]
+    )
+    let variations = template.variations(keys: ["codex", "factory", "grok"])
+
+    let comparison = template.comparison(of: "factory", against: "codex", variations: variations)
+    let lines = comparison.segments.flatMap { segment -> [FileComparison.Line] in
+      switch segment {
+      case .hunk(let hunk): hunk.lines
+      case .unchanged(let lines): lines
+      }
+    }
+
+    #expect(lines.filter { $0.kind != .added }.map(\.text).joined(separator: "\n") == codex)
+    #expect(lines.filter { $0.kind != .removed }.map(\.text).joined(separator: "\n") == factory)
+    #expect(comparison.additions == 2)
+    #expect(comparison.deletions == 5)
+    let title = try #require(lines.first { $0.kind == .added })
+    #expect(title.words?.contains(.added("Droid")) == true)
+    #expect(
+      template.comparison(of: "grok", against: "codex", variations: variations).isIdentical
+    )
+  }
+
+  @Test
+  func wordDiffIsolatesChangedWords() {
+    let rows = LineDiff.words(
+      from: "use Codex's integrated question function to confirm",
+      to: "use Droid's built-in question tool to confirm"
+    )
+
+    #expect(rows == [
+      .same("use "),
+      .removed("Codex's integrated"),
+      .added("Droid's built-in"),
+      .same(" question "),
+      .removed("function"),
+      .added("tool"),
+      .same(" to confirm"),
+    ])
+  }
+
+  @Test
   func resolvingAVariationSharesTheChosenText() {
     let template = InstructionTemplate.importing(
       base: codex,

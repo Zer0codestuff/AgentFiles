@@ -12,6 +12,13 @@ enum LineDiff {
     case same(String)
     case removed(String)
     case added(String)
+
+    var isSame: Bool {
+      if case .same = self {
+        return true
+      }
+      return false
+    }
   }
 
   static func lines(in content: String) -> [String] {
@@ -55,6 +62,87 @@ enum LineDiff {
 
   static func rows(from old: String, to new: String) -> [Row] {
     operations(from: lines(in: old), to: lines(in: new))
+  }
+
+  static func rows(from old: [String], to new: [String]) -> [Row] {
+    operations(from: old, to: new)
+  }
+
+  /// A word-level diff. Rows hold runs of words, spaces, and punctuation, and
+  /// joining the `same` and `removed` runs reproduces `old`.
+  static func words(from old: String, to new: String) -> [Row] {
+    let rows = operations(from: tokens(in: old), to: tokens(in: new))
+
+    // A space between two changes reads better as part of the change.
+    var joined: [Row] = []
+    for (index, row) in rows.enumerated() {
+      if case .same(let token) = row, token.allSatisfy(\.isWhitespace),
+        index > 0, index + 1 < rows.count,
+        !rows[index - 1].isSame, !rows[index + 1].isSame
+      {
+        joined += [.removed(token), .added(token)]
+      } else {
+        joined.append(row)
+      }
+    }
+    return merged(joined)
+  }
+
+  private static func tokens(in text: String) -> [String] {
+    var tokens: [String] = []
+    var current = ""
+    var currentKind: Int?
+    for character in text {
+      let kind =
+        character.isLetter || character.isNumber || character == "'" || character == "’"
+        ? 0 : character.isWhitespace && character != "\n" ? 1 : 2
+      if kind != currentKind || kind == 2, !current.isEmpty {
+        tokens.append(current)
+        current = ""
+      }
+      current.append(character)
+      currentKind = kind
+    }
+    if !current.isEmpty {
+      tokens.append(current)
+    }
+    return tokens
+  }
+
+  /// Groups removals before additions inside each change, then joins neighbors.
+  private static func merged(_ rows: [Row]) -> [Row] {
+    var result: [Row] = []
+    var removed = ""
+    var added = ""
+
+    func flush() {
+      if !removed.isEmpty {
+        result.append(.removed(removed))
+      }
+      if !added.isEmpty {
+        result.append(.added(added))
+      }
+      removed = ""
+      added = ""
+    }
+
+    for row in rows {
+      switch row {
+      case .removed(let text):
+        removed += text
+      case .added(let text):
+        added += text
+      case .same(let text):
+        flush()
+        if case .same(let previous) = result.last {
+          result[result.count - 1] = .same(previous + text)
+        } else {
+          result.append(.same(text))
+        }
+      }
+    }
+    flush()
+    return result
   }
 
   private static func operations(from old: [String], to new: [String]) -> [Row] {

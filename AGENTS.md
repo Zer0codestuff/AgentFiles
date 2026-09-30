@@ -8,7 +8,9 @@ Agent Files is a macOS 26 SwiftUI app for managing the instruction files of Clau
 
 Global workspaces include Cursor and Warp as copy-only targets (`WorkspaceTarget.writesFile == false`) because both keep user rules in app settings. `AppIconProvider` loads agent icons from installed apps through Launch Services, with a drawn `GrokMark` for Grok Build.
 
-Views use a two-column `NavigationSplitView`: a sidebar with Global, projects, and Skills, and a detail pane with per-file tabs, an Edit mode, and a Differences mode. The app is a regular Dock app and quits when its window closes.
+Views use a two-column `NavigationSplitView`: a sidebar with Global, projects, and Skills, and a detail pane with per-file tabs, an Edit mode, and a Differences mode. Differences is a GitHub-style diff: the selected tab is the reference, every other file gets a card with numbered red and green lines, changed words highlighted, and folded unchanged lines. `FileComparison` builds these diffs from the template, so each hunk maps to a `TemplateVariation` for Use for All. The app is a regular Dock app and quits when its window closes.
+
+The app icon is an Icon Composer file at `Icon/AppIcon.icon`, drawn by `script/make_icon.swift` and compiled with `actool` during the build, so macOS 26 applies its own shape and glass.
 
 ## Run, build, and test
 
@@ -16,16 +18,19 @@ Views use a two-column `NavigationSplitView`: a sidebar with Global, projects, a
 - Verify launch with `./script/build_and_run.sh --verify`.
 - Build with `swift build`.
 - Run focused package tests with `./script/test.sh`.
+- Regenerate the icon layers with `swift script/make_icon.swift Icon/AppIcon.icon`. The build needs Xcode 26 for `actool`.
 
 The run script stages and ad hoc signs `dist/Agent Files.app`. Codex's Run action is configured in `.codex/environments/environment.toml`.
 The test script invokes `swift test` with the active toolchain's Swift Testing framework paths. This is required by the current Command Line Tools installation.
 
 ## Current status
 
-The repository targets macOS 26 and Swift 6. On 2026-09-29, all 29 focused tests passed, and setup, editing, Differences, and outside-change review were checked in the running app against a sandboxed home folder. Set `AGENT_FILES_HOME` to run the app against a sandboxed home folder instead of the real one.
+The repository targets macOS 26 and Swift 6. On 2026-09-30, all 31 focused tests passed, and the new Differences view and app icon were checked in the running app with the real Global workspace. Set `AGENT_FILES_HOME` to run the app against a sandboxed home folder instead of the real one.
 
 ## Recent changes
 
+- Rebuilt Differences as a GitHub-style diff against the selected tab, with `+N −N` counts on the other tabs, word highlights, and Use for All per hunk.
+- Added the app icon: three stacked sheets (Grok violet, Codex blue, and a white sheet with a Claude orange heading) on a dark tile.
 - Replaced sync groups, layers, and the menu bar extra with template-based workspaces for Global and project instructions.
 - Added per-file editing with a shared or file-only save scope, a Differences view with Use for All, and review for files changed outside the app.
 - Added Cursor and Warp to Global as copy-only targets and replaced symbol badges with real app icons.
@@ -56,3 +61,4 @@ The repository targets macOS 26 and Swift 6. On 2026-09-29, all 29 focused tests
 - Do not overwrite a file after concurrent edits without an explicit user action.
 - Do not replace native macOS sidebars, toolbars, or controls with custom chrome.
 - Do not add markers or other app metadata to instruction files.
+- Do not ship the icon as a plain `.icns` only; macOS 26 puts it in a gray frame.

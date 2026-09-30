@@ -6,6 +6,10 @@
     <string>Agent Files</string>
     <key>CFBundleExecutable</key>
     <string>AgentFiles</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.gabrielemonni.AgentFiles</string>
     <key>CFBundleName</key>

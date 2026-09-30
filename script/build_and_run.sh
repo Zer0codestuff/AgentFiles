@@ -25,9 +25,17 @@ if [[ "$APP_BUNDLE" != "$ROOT_DIR/dist/Agent Files.app" ]]; then
 fi
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS"
+mkdir -p "$APP_MACOS" "$APP_CONTENTS/Resources"
 cp "$BUILD_BINARY" "$APP_BINARY"
 cp "$ROOT_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
+
+# Compile the Icon Composer file so macOS 26 applies its own icon shape and glass.
+ICON_WORK="$(mktemp -d)"
+xcrun actool "$ROOT_DIR/Icon/AppIcon.icon" --compile "$ICON_WORK" --platform macosx \
+    --minimum-deployment-target 26.0 --app-icon AppIcon \
+    --output-partial-info-plist "$ICON_WORK/partial.plist" >/dev/null
+cp "$ICON_WORK/Assets.car" "$ICON_WORK/AppIcon.icns" "$APP_CONTENTS/Resources/"
+rm -rf "$ICON_WORK"
 chmod +x "$APP_BINARY"
 codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null
 

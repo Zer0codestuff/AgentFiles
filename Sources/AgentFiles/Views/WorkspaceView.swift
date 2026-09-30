@@ -94,17 +94,30 @@ struct WorkspaceView: View {
           onShowDifferences: { mode = .differences }
         )
       case .differences:
-        DifferencesView(store: store, workspace: workspace, template: template)
+        DifferencesView(
+          store: store,
+          workspace: workspace,
+          template: template,
+          reference: target
+        )
       }
     }
   }
 
   private func tabBar(template: InstructionTemplate, selected: WorkspaceTarget) -> some View {
-    ScrollView(.horizontal, showsIndicators: false) {
+    let variations = mode == .differences ? template.variations(keys: workspace.keys) : []
+    return ScrollView(.horizontal, showsIndicators: false) {
       GlassEffectContainer(spacing: 8) {
         HStack(spacing: 8) {
           ForEach(workspace.targets) { target in
-            tab(target, isSelected: target.key == selected.key && mode == .edit)
+            let isSelected = target.key == selected.key
+            tab(
+              target,
+              isSelected: isSelected,
+              comparison: mode == .differences && !isSelected
+                ? template.comparison(of: target.key, against: selected.key, variations: variations)
+                : nil
+            )
           }
         }
       }
@@ -113,12 +126,17 @@ struct WorkspaceView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func tab(_ target: WorkspaceTarget, isSelected: Bool) -> some View {
+  /// In Differences, the selected tab is the file the others are compared with, and
+  /// the other tabs show how many lines differ from it.
+  private func tab(
+    _ target: WorkspaceTarget,
+    isSelected: Bool,
+    comparison: FileComparison?
+  ) -> some View {
     let status = store.status(of: target, in: workspace)
     return Button {
       withAnimation(.smooth(duration: 0.25)) {
         selectedKey = target.key
-        mode = .edit
       }
     } label: {
       HStack(spacing: 8) {
@@ -131,7 +149,22 @@ struct WorkspaceView: View {
             .foregroundStyle(.secondary)
             .help("Unsaved changes")
         }
-        if let symbol = status.symbol {
+        if let comparison {
+          if comparison.isIdentical {
+            Image(systemName: "equal")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .help("Same as the selected file")
+          } else {
+            HStack(spacing: 3) {
+              Text("+\(comparison.additions)")
+                .foregroundStyle(.green)
+              Text("−\(comparison.deletions)")
+                .foregroundStyle(.red)
+            }
+            .font(.caption.monospacedDigit().weight(.medium))
+          }
+        } else if let symbol = status.symbol {
           Image(systemName: symbol)
             .font(.caption)
             .foregroundStyle(status.color)
@@ -149,7 +182,11 @@ struct WorkspaceView: View {
       in: Capsule()
     )
     .glassEffectID(target.key, in: tabNamespace)
-    .help(target.readersDescription)
+    .help(
+      mode == .differences && !isSelected
+        ? "Compare the other files with \(target.title)"
+        : target.readersDescription
+    )
   }
 }
 
