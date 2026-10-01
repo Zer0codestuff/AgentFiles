@@ -3,9 +3,16 @@ import SwiftUI
 
 struct SettingsView: View {
   let store: AgentFilesStore
+  @State private var showsInstructionSync = false
 
   var body: some View {
     Form {
+      Section("Sync across computers") {
+        Label(store.syncStatus, systemImage: "icloud")
+        Button("Manage Instruction Sync") { showsInstructionSync = true }
+        Text("Private GitHub sync for instruction files. Skills are excluded.")
+          .font(.caption).foregroundStyle(.secondary)
+      }
       Section("Instructions") {
         Text(
           "Each workspace keeps one shared text in Agent Files and writes a plain file for every agent. Files changed in another app are never overwritten until you review them."
@@ -37,7 +44,10 @@ struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: 500, height: 420)
+    .frame(width: 500, height: 540)
+    .sheet(isPresented: $showsInstructionSync) {
+      InstructionSyncView(store: store)
+    }
   }
 
   private func reveal(_ directory: URL) {

@@ -22,6 +22,20 @@ struct ContentView: View {
       }
     }
     .frame(minWidth: 860, minHeight: 540)
+    .toolbar {
+      ToolbarItem(placement: .automatic) {
+        Button {
+          store.showsSync = true
+        } label: {
+          Label("Sync", systemImage: store.syncError != nil || !store.syncConflicts.isEmpty
+            ? "exclamationmark.icloud" : "icloud")
+        }
+        .help(store.syncStatus)
+      }
+    }
+    .sheet(isPresented: Binding(get: { store.showsSync }, set: { store.showsSync = $0 })) {
+      InstructionSyncView(store: store)
+    }
     .alert(
       store.notice?.title ?? "",
       isPresented: Binding(
@@ -41,6 +55,7 @@ struct ContentView: View {
     }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
       store.refreshFiles()
+      store.scheduleInstructionSync()
     }
   }
 }

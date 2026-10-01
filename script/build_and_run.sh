@@ -29,6 +29,15 @@ mkdir -p "$APP_MACOS" "$APP_CONTENTS/Resources"
 cp "$BUILD_BINARY" "$APP_BINARY"
 cp "$ROOT_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
 
+# Bundle GitHub's sign-in helper so other computers do not need a separate CLI install.
+GITHUB_CLI="$(command -v gh || true)"
+if [[ -n "$GITHUB_CLI" ]]; then
+    mkdir -p "$APP_CONTENTS/Helpers"
+    cp "$GITHUB_CLI" "$APP_CONTENTS/Helpers/gh"
+    cp "$ROOT_DIR/Support/GitHub-CLI-LICENSE.txt" "$APP_CONTENTS/Resources/"
+    codesign --force --sign - "$APP_CONTENTS/Helpers/gh" >/dev/null
+fi
+
 # Compile the Icon Composer file so macOS 26 applies its own icon shape and glass.
 ICON_WORK="$(mktemp -d)"
 xcrun actool "$ROOT_DIR/Icon/AppIcon.icon" --compile "$ICON_WORK" --platform macosx \

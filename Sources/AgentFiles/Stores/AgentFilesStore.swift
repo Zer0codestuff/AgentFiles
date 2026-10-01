@@ -11,6 +11,19 @@ final class AgentFilesStore {
   var selection: SidebarItem?
   var notice: AppNotice?
 
+  var syncState: InstructionSyncState
+  var syncConflicts: [InstructionSyncConflict] = []
+  var syncError: String?
+  var syncArchiveNeedsRestore = false
+  var isSyncing = false
+  var isSigningIn = false
+  var syncSignInCode: String?
+  var showsSync = false
+  let syncRemote: any InstructionSyncRemote
+  let syncStateStore: InstructionSyncStateStore
+  var syncTimerTask: Task<Void, Never>?
+  var syncDebounceTask: Task<Void, Never>?
+
   // Skill state is written by AgentFilesStore+Skills.swift.
   var skillLocations: [SkillLocation] = []
   var skills: [SkillRecord] = []
@@ -38,7 +51,8 @@ final class AgentFilesStore {
     fileAccess: FileAccessService = FileAccessService(),
     backupService: BackupService = BackupService(),
     skillLibrary: SkillLibraryService = SkillLibraryService(),
-    homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+    homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+    syncRemote: any InstructionSyncRemote = GitHubInstructionSync()
   ) {
     self.configurationStore = configurationStore
     self.templateStore = templateStore
@@ -46,6 +60,17 @@ final class AgentFilesStore {
     self.backupService = backupService
     self.skillLibrary = skillLibrary
     self.homeDirectory = homeDirectory
+    self.syncRemote = syncRemote
+    syncStateStore = InstructionSyncStateStore(
+      fileURL: configurationStore.fileURL.deletingLastPathComponent()
+        .appendingPathComponent("instruction-sync.json")
+    )
+    do {
+      syncState = try syncStateStore.load()
+    } catch {
+      syncState = .init()
+      syncError = "Sync settings could not be loaded: \(error.localizedDescription)"
+    }
     skillLocations = SkillLocation.defaultLocations(home: homeDirectory)
 
     do {
@@ -130,6 +155,7 @@ final class AgentFilesStore {
     refreshFiles()
     watchFiles()
     startSkillLibrary()
+    startInstructionSync()
   }
 
   func refreshFiles() {
@@ -254,7 +280,7 @@ final class AgentFilesStore {
       .filter { $0.key != baseKey }
       .compactMap { target in content(of: target).map { (key: target.key, content: $0) } }
     let template = InstructionTemplate.importing(base: base, others: others)
-      .pruned(keys: workspace.keys)
+      .pruned(keys: templateKeys(for: workspace))
     commit(template, to: workspace, previous: nil)
   }
 
@@ -284,7 +310,7 @@ final class AgentFilesStore {
     }
 
     let updated = template.applying(edited: content, from: key, scope: scope)
-      .pruned(keys: workspace.keys)
+      .pruned(keys: templateKeys(for: workspace))
     return commit(updated, to: workspace, previous: template)
   }
 
@@ -299,7 +325,7 @@ final class AgentFilesStore {
     }
 
     let updated = template.applying(edited: content, from: key, scope: scope)
-      .pruned(keys: workspace.keys)
+      .pruned(keys: templateKeys(for: workspace))
     commit(updated, to: workspace, previous: template)
   }
 
@@ -328,7 +354,7 @@ final class AgentFilesStore {
     else {
       return
     }
-    let updated = template.resolving(variation, with: lines).pruned(keys: workspace.keys)
+    let updated = template.resolving(variation, with: lines).pruned(keys: templateKeys(for: workspace))
     commit(updated, to: workspace, previous: template)
   }
 
@@ -382,6 +408,8 @@ final class AgentFilesStore {
     refreshFiles()
     watchFiles()
 
+    scheduleInstructionSync()
+
     if !failures.isEmpty {
       notice = AppNotice(
         title: "Some files could not be written",
@@ -413,5 +441,85 @@ final class AgentFilesStore {
         message: error.localizedDescription
       )
     }
+  }
+
+  /// Keep variants for agents installed on other computers when pruning shared templates.
+  private func templateKeys(for workspace: Workspace) -> [String] {
+    workspace.kind == .global ? AgentTool.harnesses.map(\.templateKey) : workspace.keys
+  }
+
+  func localSyncDocument() -> InstructionSyncDocument {
+    InstructionSyncDocument(workspaces: workspaces.compactMap { workspace in
+      guard let template = templates[workspace.id] else { return nil }
+      let id = workspace.kind == .global ? "global"
+        : syncState.projectBindings.first(where: { $0.value == workspace.id })?.key
+          ?? workspace.id.uuidString
+      return SyncedWorkspace(id: id, name: workspace.name, kind: workspace.kind,
+        keys: templateKeys(for: workspace).sorted(), template: template.text)
+    }.sorted { $0.id < $1.id })
+  }
+
+  /// Import existing instructions for sync without creating or changing any managed files.
+  func prepareInstructionsForSync() throws {
+    refreshFiles()
+    for workspace in workspaces where templates[workspace.id] == nil && !workspace.targets.isEmpty {
+      let available = workspace.targets.compactMap { target in
+        content(of: target).map { (key: target.key, content: $0) }
+      }
+      guard let first = available.first else { continue }
+      let template = InstructionTemplate.importing(base: first.content, others: Array(available.dropFirst()))
+        .pruned(keys: templateKeys(for: workspace))
+      try templateStore.save(template, workspaceID: workspace.id)
+      templates[workspace.id] = template
+    }
+  }
+
+  func localWorkspace(for synced: SyncedWorkspace) -> Workspace? {
+    if synced.kind == .global { return globalWorkspace }
+    return workspace(id: syncState.projectBindings[synced.id] ?? UUID(uuidString: synced.id))
+  }
+
+  @discardableResult
+  func applySyncedWorkspace(_ synced: SyncedWorkspace) throws -> Bool {
+    guard let workspace = localWorkspace(for: synced) else { return false }
+    let incoming = synced.instructions
+    let previous = templates[workspace.id]
+    let hasMissingFiles = workspace.targets.contains { $0.writesFile && read($0.url) == .missing }
+    guard previous != incoming || hasMissingFiles else { return true }
+    // A local template also needs a backup, including copy-only variants.
+    if previous != incoming {
+      try backupService.backup(
+        fileAt: templateStore.directory.appendingPathComponent("\(workspace.id.uuidString).md"),
+        workspaceID: workspace.id, key: "template"
+      )
+    }
+    guard commit(incoming, to: workspace, previous: previous) else {
+      throw InstructionSyncError.message("Some instruction files could not be updated. Fix the file access error and sync again.")
+    }
+    return true
+  }
+
+  /// A synced project is mapped explicitly because its location differs on each computer.
+  func linkSyncedProject(_ synced: SyncedWorkspace, at folder: URL) {
+    guard !isSyncing, synced.kind == .project else { return }
+    addProject(at: folder)
+    guard let project = projects.first(where: { $0.rootPath == folder.standardizedFileURL.path }) else { return }
+    if syncState.projectBindings.contains(where: { $0.value == project.id && $0.key != synced.id }) {
+      syncError = "This folder is already connected to another synced project."
+      return
+    }
+    // Preserve existing local instructions. Different content becomes a sync conflict.
+    do {
+      try prepareInstructionsForSync()
+      syncState.projectBindings[synced.id] = project.id
+      if let index = configuration.workspaces.firstIndex(where: { $0.id == project.id }) {
+        configuration.workspaces[index].name = synced.name
+        persistConfiguration()
+      }
+      // First linking is an import, even if this computer has already seen the cloud record.
+      syncState.base.workspaces.removeAll { $0.id == synced.id }
+      try saveSyncState()
+      Task { await syncInstructions() }
+    } catch { syncError = error.localizedDescription }
   }
 }
