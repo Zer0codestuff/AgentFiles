@@ -43,6 +43,7 @@ The repository targets macOS 26 and Swift 6. On 2026-10-01, 43 focused tests pas
 ## Project preferences and constraints
 
 - Keep source, UI copy, documentation, and metadata in English.
+- Keep Zer0codestuff as the sole author of GitHub commits; never add agent signatures or Co-authored-by trailers.
 - Use native SwiftUI structure and system Liquid Glass before custom materials.
 - Keep the sidebar lightweight and preserve maximum editor space.
 - Back up content before any app-initiated overwrite.
