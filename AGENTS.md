@@ -27,7 +27,7 @@ The test script invokes `swift test` with the active toolchain's Swift Testing f
 
 ## Current status
 
-The repository targets macOS 26 and Swift 6. On 2026-10-01, 43 focused tests passed, including two-computer synchronization, conflict choices, concurrent uploads, outside edits, folder mapping, newly installed agents, and archive recovery. The private sync repository was created through the app and the first real Global upload was verified without changing managed files. The sync and conflict windows were visually checked, and a conflict was resolved through the app against an isolated home folder. Set `AGENT_FILES_HOME` to run the app against a sandboxed home folder instead of the real one.
+The repository targets macOS 26 and Swift 6. On 2026-10-05, all 43 focused tests passed, including two-computer synchronization, conflict choices, concurrent uploads, outside edits, folder mapping, newly installed agents, and archive recovery. The build with GitHub sync was installed at `/Applications/Agent Files.app` on the MacBook Air and connected through the app to the private `Zer0codestuff/agent-files-sync` repository. The existing Global conflict was resolved using the synced version after backing up local content. Claude, Codex, and Factory files were verified byte-for-byte against the archive, with automatic sync enabled. The archive contains all six Global variants and no project workspaces; Cursor and Warp remain copy-only, and Grok's variant is retained for computers where it is installed. Set `AGENT_FILES_HOME` to run the app against a sandboxed home folder instead of the real one.
 
 ## Recent changes
 
